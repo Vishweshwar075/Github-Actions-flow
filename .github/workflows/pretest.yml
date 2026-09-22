@@ -1,4 +1,4 @@
-﻿name: Pre-Test Checks
+name: Pre-Test Checks
 
 on:
   pull_request:

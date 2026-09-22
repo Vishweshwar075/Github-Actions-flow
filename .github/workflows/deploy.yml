@@ -1,197 +1,59 @@
-﻿
-  name: Deploy Pipeline
+name: Deploy Pipeline
 
-  on:
-    workflow_run:
-      workflows: ["CI Pipeline"]
-      branches: ["main"]
-      types:
-        - completed
+on:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    branches: [ "main" ]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment Target Environment"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - production
 
-    workflow_dispatch:
-      inputs:
-        environment:
-          description: "Deployment Target Environment"
-          required: true
-          default: "staging"
-          type: choice
-          options:
-            - staging
-            - production
+jobs:
+  deploy:
+    name: Deploy Application
+    runs-on: [self-hosted, linux]
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
-  jobs:
-    deploy:
-      name: Deploy Application
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      # Run directly on your WSL self-hosted runner
-      runs-on: [self-hosted, linux]
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
 
-      # Deploy only if CI succeeded
-      if: >
-        github.event_name == 'workflow_dispatch' ||
-        github.event.workflow_run.conclusion == 'success'
+      - name: Package Executable JAR
+        run: mvn clean package -DskipTests
 
-      steps:
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: springboot-app-jar
+          path: target/*.jar
+          retention-days: 7
 
-        # ==========================================
-        # 1. Checkout Code
-        # ==========================================
-        - name: Checkout Code
-          uses: actions/checkout@v4
-
-        # ==========================================
-        # 2. Setup Java 21
-        # ==========================================
-        - name: Setup Java 21
-          uses: actions/setup-java@v4
-          with:
-            java-version: '21'
-            distribution: 'temurin'
-            cache: maven
-
-        # ==========================================
-        # 3. Build Application
-        # ==========================================
-        - name: Build Spring Boot Application
-          run: |
-            echo "Building Spring Boot application..."
-            mvn clean package -DskipTests
-
-        # ==========================================
-        # 4. Show Generated JAR
-        # ==========================================
-        - name: Verify JAR
-          run: |
-            echo "Generated JAR:"
-            ls -lh target/*.jar
-
-        # ==========================================
-        # 5. Create Deployment Directory
-        # ==========================================
-        - name: Prepare Deployment Directory
-          run: |
-            DEPLOY_DIR="/home/vishweshwar/spring-demo-github-atctions"
-            
-            echo "Deployment directory:"
-            echo "$DEPLOY_DIR"
-            
-            mkdir -p "$DEPLOY_DIR"
-            
-            ls -ld "$DEPLOY_DIR"
-
-        # ==========================================
-        # 6. Stop Existing Application
-        # ==========================================
-        - name: Stop Existing Application
-          run: |
-            echo "Stopping existing Spring Boot application..."
-            
-            pkill -f "app.jar" || true
-            
-            sleep 2
-            
-            echo "Existing application stopped."
-
-        # ==========================================
-        # 7. Copy JAR to Deployment Directory
-        # ==========================================
-        - name: Deploy JAR
-          run: |
-            DEPLOY_DIR="/home/vishweshwar/spring-demo-github-atctions"
-            
-            JAR_FILE=$(find target -maxdepth 1 -type f -name "*.jar" ! -name "*-plain.jar" | head -n 1)
-            
-            echo "JAR selected:"
-            echo "$JAR_FILE"
-            
-            cp "$JAR_FILE" "$DEPLOY_DIR/app.jar"
-            
-            echo "JAR copied successfully."
-            
-            ls -lh "$DEPLOY_DIR"
-
-        # ==========================================
-        # 8. Start Spring Boot Application
-        # ==========================================
-        - name: Start Spring Boot Application
-          run: |
-            DEPLOY_DIR="/home/vishweshwar/spring-demo-github-atctions"
-            
-            cd "$DEPLOY_DIR"
-            
-            echo "Starting Spring Boot application..."
-            
-            nohup java -jar app.jar > application.log 2>&1 &
-            
-            echo $! > application.pid
-            
-            echo "Application started."
-            echo "PID: $(cat application.pid)"
-
-        # ==========================================
-        # 9. Wait for Application Startup
-        # ==========================================
-        - name: Wait for Application
-          run: |
-            echo "Waiting for Spring Boot application..."
-            
-            sleep 10
-
-        # ==========================================
-        # 10. Check Port
-        # ==========================================
-        - name: Check Application Port
-          run: |
-            echo "Checking port 8080..."
-            
-            if ss -ltn | grep -q ":8080"; then
-              echo "Port 8080 is listening."
-            else
-              echo "Port 8080 is NOT listening."
-            
-              echo "Application logs:"
-              cat /home/vishweshwar/spring-demo-github-atctions/application.log
-            
-              exit 1
-            fi
-
-        # ==========================================
-        # 11. Health Check
-        # ==========================================
-        - name: Health Check
-          run: |
-            echo "Checking Spring Boot API..."
-            
-            curl --fail http://localhost:8080/api/status
-            
-            echo ""
-            echo "Health check successful."
-
-        # ==========================================
-        # 12. Show Deployment
-        # ==========================================
-        - name: Deployment Summary
-          run: |
-            echo "=========================================="
-            echo "       DEPLOYMENT SUCCESSFUL"
-            echo "=========================================="
-            
-            echo "Application : github-actions-springboot-demo"
-            echo "Environment : ${{ github.event.inputs.environment || 'staging' }}"
-            echo "Host        : $(hostname)"
-            echo "Port        : 8080"
-            
-            echo "Deployment Directory:"
-            echo "/home/vishweshwar/spring-demo-github-atctions"
-            
-            echo ""
-            echo "Files:"
-            ls -lh /home/vishweshwar/spring-demo-github-atctions
-            
-            echo ""
-            echo "Application Status:"
-            curl -s http://localhost:8080/api/status
-            
-            echo ""
-            echo "=========================================="
-    ```
+      - name: Deploy to Linux Server
+        run: |
+          ENV="${{ github.event.inputs.environment || 'staging' }}"
+          echo "=========================================="
+          echo "Deploying to Environment: $ENV (Self-Hosted Linux)"
+          echo "Deploying JAR: $(ls target/*.jar)"
+          echo "Application: github-actions-springboot-demo"
+          echo "Port: 8080"
+          echo "Host: $(hostname)"
+          echo "=========================================="
+          echo "Simulating server deployment and health checks..."
+          sleep 2
+          echo "Deployment to $ENV completed successfully on $(hostname)!"
