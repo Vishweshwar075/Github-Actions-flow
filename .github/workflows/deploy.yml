@@ -20,7 +20,7 @@ on:
 jobs:
   deploy:
     name: Deploy Application
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
@@ -44,15 +44,16 @@ jobs:
           path: target/*.jar
           retention-days: 7
 
-      - name: Simulate Deployment
+      - name: Deploy to Linux Server
         run: |
           ENV="${{ github.event.inputs.environment || 'staging' }}"
           echo "=========================================="
-          echo "Deploying to Environment: $ENV"
+          echo "Deploying to Environment: $ENV (Self-Hosted Linux)"
           echo "Deploying JAR: $(ls target/*.jar)"
           echo "Application: github-actions-springboot-demo"
           echo "Port: 8080"
+          echo "Host: $(hostname)"
           echo "=========================================="
           echo "Simulating server deployment and health checks..."
           sleep 2
-          echo "Deployment to $ENV completed successfully!"
+          echo "Deployment to $ENV completed successfully on $(hostname)!"
