@@ -25,7 +25,7 @@ class DemoControllerTest {
         mockMvc.perform(get("/api/hello").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.message").value("Hello from Spring Boot!"));
+                .andExpect(jsonPath("$.message").value("Hello from Spring Boot!welcome back"));
     }
 
     @Test
