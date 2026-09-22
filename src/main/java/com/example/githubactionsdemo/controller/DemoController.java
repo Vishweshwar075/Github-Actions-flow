@@ -12,8 +12,7 @@ public class DemoController {
 
     @GetMapping("/hello")
     public Map<String, String> hello() {
-
-        return Map.of("message", "Hello from Spring Boot! welcome back ");
+        return Map.of("message", "Hello from Spring Boot!welcome back");
     }
 
     @GetMapping("/status")
@@ -24,3 +23,4 @@ public class DemoController {
         );
     }
 }
+
